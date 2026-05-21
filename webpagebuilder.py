@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import os
 import sys
 import eigsep_observing as eo
-from ActiveFlagger import activeflag
 from eigsep_observing import EigsepRedis
 import time
 import webbrowser
@@ -69,6 +68,10 @@ class Website:
   @classmethod
   def lin(cls, x): # Linearizes the datapoints in x.
     return 20* np.log10(np.abs(x))
+
+  @classmethod
+  def mlin(cls, x): # Takes the mean of the linearized data.
+    return np.mean(cls.lin(x))
 
   @classmethod
   def seefile(cls, data, cal): # Plots the S11 data.
@@ -275,13 +278,49 @@ class Website:
           if np.mean(cls.tdata[i][1][x:-1]) > pvals[i] + 5: # Checks if average is above certain value.
             probs[i][1] = True
     return probs
+
+  @classmethod
+  def activeflag(cls, data, cal, lowo = -5, higho = 0,lows = -5, highs = 0, highl = -30,
+                 highd = -5, highr = -5, higha = -5, highal = -30, highn = -30): 
+    # Checks normalacy as data is recorded after required amount of data; is either whole or scrolling.
+    # Returns a dictionary.
+    # Presets exist, but can be changed.
+    flags = {}
+    vnao = cls.mlin(cal["VNAO"]) # Get calibration values.
+    vnas = cls.mlin(cal["VNAS"])
+    vnal = cls.mlin(cal["VNAL"])
+    good = True # Assume everything is normal, note if not.
+    if lowo > vnao:
+        good = False
+    elif higho < vnao:
+        good = False
+    if lows > vnas:
+        good = False
+    elif highs < vnas:
+        good = False
+    if highl < vnal:
+        good = False
+    flags.update({"cal": good})
+    if len(data) == 1: # If there is just the recorded data, focus on that.
+      rec = cls.mlin(data["rec"])
+      rnorm = bool(highr > rec)
+      flags.update({"rec": rnorm})
+    else: # Otherwise, check normalacy of each data stream.
+      ante = cls.mlin(data["ant"])
+      load = cls.mlin(data["load"])
+      loud = cls.mlin(data["noise"])
+      anorm = bool(higha > ante)
+      alnorm = bool(highal > load)
+      nnorm = bool(highn > loud)
+      flags.update({"ant": anorm, "load": alnorm, "noise": nnorm})
+    return flags
   
   @classmethod
   def buildpage(cls, meta={}, data={}, cal={}, spec = {}, fname="", active=False, path="."): # Creates webpage; "active" specifices wheter it is live or static.
     # global opene
     # global IMGGGG
     if not active: # Gets data if just reading from a regular file.
-      normal = activeflag(data,cal)
+      normal = cls.activeflag(data,cal)
       mia = meta["imu_antenna"]
       mip = meta["imu_panda"]
       tec = meta["tempctrl"]
@@ -294,7 +333,7 @@ class Website:
       except KeyError:
         print("No metadata being collected; this is going to cause problems!")
         mia, mip, pot, tec, lid, mot, rfs = [0], [0], {"pot_el_voltage": 0, "pot_az_voltage":0}, {"A_status": "error", "B_status": "error", "A_timestamp":0, "A_T_now":0, "B_timestamp":0, "B_T_now":0}, {"distance_m": 0}, {"az_pos": 0, "el_pos": 0}, {"sw_state":0}
-      normal = activeflag(cls.data, cls.cal) # The table of normal values is from current data.
+      normal = cls.activeflag(cls.data, cls.cal) # The table of normal values is from current data.
     else: # If not active, updates tdata on its over; the graph will be one point in time.
       tdata = np.append(tdata, [
                               [[tec["A_timestamp"]], [tec["A_T_now"]]], [[tec["B_timestamp"]], [tec["B_T_now"]]]], axis = 2)
