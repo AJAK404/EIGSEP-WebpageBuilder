@@ -1,19 +1,20 @@
 import numpy as np
 
-def lin(x):
+def lin(x): # Linearizes data.
   return 20* np.log10(np.abs(x))
 
-def mlin(x):
+def mlin(x): # Takes the mean of the linearized data.
   return np.mean(lin(x))
 
 def activeflag(data, cal, lowo = -5, higho = 0,lows = -5, highs = 0, highl = -30,
-               highd = -5, highr = -5, higha = -5, highal = -30, highn = -30):
+               highd = -5, highr = -5, higha = -5, highal = -30, highn = -30): 
   # Checks normalacy as data is recorded after required amount of data; is either whole or scrolling.
+  # Presets exist, but can be changed.
   flags = {}
-  vnao = mlin(cal["VNAO"])
+  vnao = mlin(cal["VNAO"]) # Get calibration values.
   vnas = mlin(cal["VNAS"])
   vnal = mlin(cal["VNAL"])
-  good = True
+  good = True # Assume everything is normal, note if not.
   if lowo > vnao:
       good = False
   elif higho < vnao:
@@ -25,11 +26,11 @@ def activeflag(data, cal, lowo = -5, higho = 0,lows = -5, highs = 0, highl = -30
   if highl < vnal:
       good = False
   flags.update({"cal": good})
-  if len(data) == 1:
+  if len(data) == 1: # If there is just the recorded data, focus on that.
     rec = mlin(data["rec"])
     rnorm = bool(highr > rec)
     flags.update({"rec": rnorm})
-  else:
+  else: # Otherwise, check normalacy of each data stream.
     ante = mlin(data["ant"])
     load = mlin(data["load"])
     loud = mlin(data["noise"])
